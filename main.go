@@ -9,16 +9,27 @@ import (
 	"log"
 	"net/http"
 	"os"
+
+	"shakesearch/client"
+
+	"github.com/labstack/echo/v4"
 )
 
 func main() {
+	e := echo.New()
+	client.RegisterHandlers(e)
+	e.GET("/api", func(c echo.Context) error {
+			return c.String(http.StatusOK, "Hello, World!")
+	})
+	e.Logger.Fatal(e.Start(":8080"))
+		
 	searcher := Searcher{}
 	err := searcher.Load("completeworks.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fs := http.FileServer(http.Dir("./static"))
+	fs := http.FileServer(http.Dir("./client/dist"))
 	http.Handle("/", fs)
 
 	http.HandleFunc("/search", handleSearch(searcher))
