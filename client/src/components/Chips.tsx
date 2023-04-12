@@ -5,12 +5,25 @@ export const Chips: React.FC<{
   onChipClick: (chip: string) => void;
 }> = ({ chips = defaultChips, onChipClick }) => {
   return (
-    <div>
+    <ul className="flex w-full gap-2">
       {chips.map((chip) => (
-        <button key={chip} onClick={() => onChipClick(chip)}>
+        <button
+          role="listitem"
+          key={chip}
+          onClick={() => onChipClick(chip)}
+          className="badge py-3"
+        >
           {chip}
         </button>
       ))}
-    </div>
+      <button
+        key="clear"
+        role="listitem"
+        onClick={() => onChipClick("")}
+        className="badge ml-auto py-3"
+      >
+        Clear
+      </button>
+    </ul>
   );
 };
