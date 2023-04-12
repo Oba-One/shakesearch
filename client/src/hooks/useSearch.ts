@@ -10,6 +10,8 @@ import { IDBPDatabase, openDB } from "idb";
 import { BehaviorSubject, merge, of } from "rxjs";
 import { useState, useEffect, useRef } from "react";
 
+interface QueryMatch {}
+
 async function initDb() {
   return await openDB("searchResultsDb", 1, {
     upgrade(db) {
@@ -24,20 +26,22 @@ export function useSearch() {
     loading: false,
     error: "",
     noResults: false,
-    query: "",
   });
+  const [query, setQuery] = useState<string>("");
   const searchRef = useRef<HTMLInputElement>(null);
   const [subject] = useState<BehaviorSubject<string>>(new BehaviorSubject(""));
 
   function handleSetQuery(query: string) {
     if (searchRef.current) {
       searchRef.current.value = query;
+      searchRef.current.dispatchEvent(new Event("input"));
     }
   }
 
   function handleSearchChange(event: React.ChangeEvent<HTMLInputElement>) {
-    subject.next(event.target.value.toLocaleLowerCase());
     console.log(event.target.value);
+
+    subject.next(event.target.value.toLocaleLowerCase());
   }
 
   useEffect(() => {
@@ -62,7 +66,6 @@ export function useSearch() {
         return {
           data,
           loading: false,
-          query: term,
           noResults: data.length === 0,
         };
       }
@@ -70,7 +73,6 @@ export function useSearch() {
       return response.json().then((data) => ({
         data: [],
         loading: false,
-        query: term,
         error: data.error,
       }));
     }
@@ -84,7 +86,7 @@ export function useSearch() {
         switchMap((term) =>
           merge(
             of(
-              { loading: true, error: "", noResults: false, query: "" },
+              { loading: true, error: "", noResults: false },
               handleSearch(term)
             )
           )

@@ -1,9 +1,26 @@
-type Status = "loading" | "error" | "success";
+import { DetailedHTMLProps, InputHTMLAttributes, forwardRef } from "react";
 
-export const Search: React.FC<{
+// type Status = "loading" | "error" | "success";
+
+interface SearchProps
+  extends DetailedHTMLProps<
+    InputHTMLAttributes<HTMLInputElement>,
+    HTMLInputElement
+  > {
   onSearchChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   loading: boolean;
-  ref: React.RefObject<HTMLInputElement>;
-}> = ({ onSearchChange, loading, ref }) => {
-  return <input onChange={onSearchChange} ref={ref} />;
-};
+}
+
+export const Search = forwardRef<HTMLInputElement, SearchProps>(
+  ({ onSearchChange, value }, ref) => {
+    return (
+      <input
+        value={value}
+        onInput={onSearchChange}
+        ref={ref}
+        placeholder="Thou shall search..."
+        className="input-bordered input-ghost input-accent input w-full"
+      />
+    );
+  }
+);
