@@ -8,86 +8,155 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
+	"regexp"
+	"sort"
+	"strings"
+	"time"
 
-	"shakesearch/client"
-
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/labstack/echo/v4"
+	"github.com/schollz/closestmatch"
+	"github.com/texttheater/golang-levenshtein/levenshtein"
 )
 
 func main() {
-	e := echo.New()
-	client.RegisterHandlers(e)
-	e.GET("/api", func(c echo.Context) error {
-			return c.String(http.StatusOK, "Hello, World!")
-	})
-	e.Logger.Fatal(e.Start(":8080"))
-		
 	searcher := Searcher{}
 	err := searcher.Load("completeworks.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fs := http.FileServer(http.Dir("./client/dist"))
-	http.Handle("/", fs)
+	e := echo.New()
 
-	http.HandleFunc("/search", handleSearch(searcher))
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "3001"
-	}
-
-	fmt.Printf("Listening on port %s...", port)
-	err = http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	e.Static("/", "client/dist")
+	e.GET("/status", func(c echo.Context) error {
+			return c.String(http.StatusOK, "Everything quiet over here.")
+	})
+	e.GET("/search", handleSearch(searcher))
+	
+	e.Logger.Fatal(e.Start("localhost:8080"))		
 }
 
-type Searcher struct {
-	CompleteWorks string
-	SuffixArray   *suffixarray.Index
-}
-
-func handleSearch(searcher Searcher) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		query, ok := r.URL.Query()["q"]
-		if !ok || len(query[0]) < 1 {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("missing search query in URL params"))
-			return
+func handleSearch(searcher Searcher) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		query := c.QueryParam("q")
+		if query == "" {
+			return c.String(http.StatusBadRequest, "missing search query in URL params")
 		}
-		results := searcher.Search(query[0])
+
+		searchResults := searcher.Search(query)
+		
 		buf := &bytes.Buffer{}
 		enc := json.NewEncoder(buf)
-		err := enc.Encode(results)
+		err := enc.Encode(searchResults)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("encoding failure"))
-			return
+			return c.String(http.StatusInternalServerError, "encoding failure")
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(buf.Bytes())
+
+		return c.JSONBlob(http.StatusOK, buf.Bytes())
 	}
+}
+
+func (s *Searcher) Search(query string) []SearchResult {
+	cacheKey := strings.ToLower(query)
+	cacheTimeout := 5 * time.Minute
+	query = cacheKey
+
+	if value, ok := s.Cache.Get(cacheKey); ok {
+		cacheEntry := value
+		if time.Since(cacheEntry.Time) < cacheTimeout {
+			return cacheEntry.Results
+		}
+	}
+
+	const maxResults = 10
+	closestQueries := s.ClosestMatch.ClosestN(query, maxResults)
+	results := []SearchResult{}
+
+	for _, closestQuery := range closestQueries {
+		idxs := s.SuffixArray.Lookup([]byte(closestQuery), -1)
+
+		for _, idx := range idxs {
+			start := idx - 250
+			if start < 0 {
+				start = 0  // stay in bounds
+			}
+			end := idx + 250
+			if end > len(s.CompleteWorks) {
+				end = len(s.CompleteWorks) // stay in bounds
+			}
+			excerpt := s.CompleteWorks[start:end]
+
+			distance := levenshtein.DistanceForStrings([]rune(query), []rune(closestQuery), levenshtein.DefaultOptions)
+
+			result := SearchResult{
+				Excerpt: excerpt,
+				Match:   closestQuery,
+				Weight:  distance,
+			}
+			results = append(results, result)
+		}
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Weight < results[j].Weight
+	})
+
+	s.Cache.Add(cacheKey, CacheEntry{
+		Results: results,
+		Time:    time.Now(),
+	})
+
+	return results
 }
 
 func (s *Searcher) Load(filename string) error {
-	dat, err := ioutil.ReadFile(filename)
+ dat, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return fmt.Errorf("Load: %w", err)
 	}
+
 	s.CompleteWorks = string(dat)
-	s.SuffixArray = suffixarray.New(dat)
+	s.CompleteWorksLowercase = strings.ToLower(string(dat))
+
+	// Create a list of lowercase words
+	wordPattern := regexp.MustCompile(`\w+`)
+	words := wordPattern.FindAllString(s.CompleteWorksLowercase, -1)
+	s.Words = words
+
+	s.SuffixArray = suffixarray.New([]byte(s.CompleteWorksLowercase))
+
+	cacheSize := 100
+	cache, err := lru.New[string, CacheEntry](cacheSize)
+	if err != nil {
+		return fmt.Errorf("Load: %w", err)
+	}
+	s.Cache = cache
+
+	// Prepare closestmatch
+	bagSizes := []int{2, 3, 4}
+	cmBuilder := closestmatch.New(s.Words, bagSizes)
+	s.ClosestMatch = cmBuilder
+
 	return nil
 }
 
-func (s *Searcher) Search(query string) []string {
-	idxs := s.SuffixArray.Lookup([]byte(query), -1)
-	results := []string{}
-	for _, idx := range idxs {
-		results = append(results, s.CompleteWorks[idx-250:idx+250])
-	}
-	return results
+type Searcher struct {
+	CompleteWorks 				 string
+	CompleteWorksLowercase string
+	Words                  []string
+	SuffixArray   				 *suffixarray.Index
+	Cache         				 *lru.Cache[string, CacheEntry]
+	ClosestMatch           *closestmatch.ClosestMatch
+}
+
+type SearchResult struct {
+    Excerpt string
+		Match   string
+    Weight  int
+}
+
+type CacheEntry struct {
+    Results []SearchResult
+    Time    time.Time
 }
