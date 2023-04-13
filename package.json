@@ -10,13 +10,15 @@
     "url": "https://github.com/Oba-One/shakesearch"
   },
   "scripts": {
-    "dev": "bash ./dev.sh",
-    "test": "yarn workspaces test",
+    "dev": "bash ./scripts/dev.sh",
+    "test": "yarn workspace client test & yarn test:go",
+    "test:go": "bash ./scripts/test.sh",
+    "test:coverage": "bash ./scripts/test-coverage.sh",
     "test:e2e": "start-server-and-test dev https://localhost:3000 cypress open",
-    "build": "yarn workspaces build"
+    "build": "yarn workspaces run build"
   },
   "devDependencies": {
-    "@swc/core": "1.3.49",
+    "@swc/core": "1.3.50",
     "@swc/jest": "0.2.24",
     "@testing-library/cypress": "9.0.0",
     "@testing-library/jest-dom": "^5.16.5",
