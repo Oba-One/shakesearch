@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,18 +38,44 @@ func main() {
 	e.Logger.Fatal(e.Start("localhost:8080"))		
 }
 
+const pageSize = 20
+
 func handleSearch(searcher Searcher) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		query := c.QueryParam("q")
+		pageParam := c.QueryParam("page")
+		page, err := strconv.Atoi(pageParam)
+		if err != nil {
+			page = 1
+		}
+
+		if page < 1 {
+		  return c.String(http.StatusBadRequest, "invalid page number")
+		}
+	
 		if query == "" {
 			return c.String(http.StatusBadRequest, "missing search query in URL params")
 		}
 
 		searchResults := searcher.Search(query)
-		
+		totalResults := len(searchResults)
+		totalPages := (totalResults + pageSize - 1) / pageSize
+
+		if page > totalPages {
+			return c.String(http.StatusNotFound, "no more results available")
+		}
+
+		start := (page - 1) * pageSize
+		end := start + pageSize
+		if end > totalResults {
+			end = totalResults
+		}
+
+		paginatedResults := searchResults[start:end]
+
 		buf := &bytes.Buffer{}
 		enc := json.NewEncoder(buf)
-		err := enc.Encode(searchResults)
+		err = enc.Encode(paginatedResults)
 		if err != nil {
 			return c.String(http.StatusInternalServerError, "encoding failure")
 		}
