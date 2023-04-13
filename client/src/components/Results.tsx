@@ -1,4 +1,7 @@
+import { Key } from "react";
 import { useTransition, a, useTrail } from "@react-spring/web";
+
+import { SearchState } from "../hooks/useSearch";
 
 type Status = "loading" | "error" | "success";
 
@@ -6,7 +9,7 @@ function getHighlightedText(text: string, highlight: string) {
   const parts = text.split(new RegExp(`(${highlight})`, "gi"));
   return (
     <span>
-      {parts.map((part: string, i: React.Key | null | undefined) => (
+      {parts.map((part: string, i: Key | null | undefined) => (
         <span
           key={i}
           style={
@@ -22,25 +25,26 @@ function getHighlightedText(text: string, highlight: string) {
   );
 }
 
-const Result: React.FC<{ excerpt: string; query: string; style: any }> = ({
+const Result: React.FC<{ excerpt: string; match: string; style: any }> = ({
   excerpt,
-  query,
+  match,
   style,
-}) => <a.li style={style}>{getHighlightedText(excerpt, query)}</a.li>;
+}) => (
+  <a.li
+    style={style}
+    className="card bg-neutral p-4 text-neutral-content shadow-xl"
+  >
+    {getHighlightedText(excerpt, match)}
+  </a.li>
+);
 
-export const Results: React.FC<{
-  matches: string[];
-  loading: boolean;
-  error: string;
-  noResults: boolean;
-}> = ({ matches, loading, error, noResults }) => {
+export const Results: React.FC<SearchState> = ({
+  matches,
+  loading,
+  error,
+  noResults,
+}) => {
   const status: Status = loading ? "loading" : error ? "error" : "success";
-
-  const transition = useTransition(status, {
-    from: { opacity: 0 },
-    enter: { opacity: 1 },
-    leave: { opacity: 0 },
-  });
 
   const trail = useTrail(matches.length, {
     from: { opacity: 0, transform: "translate3d(0, 40px, 0)" },
@@ -48,27 +52,31 @@ export const Results: React.FC<{
   });
 
   const Content = {
-    loading: <div> Loading... </div>,
-    error: <div> {error} </div>,
+    loading: (
+      <div className="flex h-14 w-14 animate-spin items-center justify-center rounded-full bg-gradient-to-tr from-indigo-500 to-pink-500">
+        <div className="h-9 w-9 rounded-full bg-base-100"></div>
+      </div>
+    ),
+    error: <div>{error}</div>,
     success: noResults ? (
       <div> No results for this search </div>
     ) : (
-      <ul className="grid h-full w-full grid-cols-[repeat(auto-fit,_minmax(300px,_1fr))]">
+      <ul className="grid grid-cols-[repeat(auto-fit,_minmax(380px,_1fr))] gap-6">
         {trail.map((style, index) => (
           <Result
-            key={matches[index]}
+            key={matches[index].excerpt}
             style={style}
-            excerpt={matches[index]}
-            query=""
+            match={matches[index].match}
+            excerpt={matches[index].excerpt}
           />
         ))}
       </ul>
     ),
   };
 
-  return transition((style, item) => (
-    <a.div className="grid w-full flex-1 place-items-center" style={style}>
-      {Content[item]}
-    </a.div>
-  ));
+  return (
+    <div className="grid h-full w-full flex-1 place-items-center">
+      {Content[status]}
+    </div>
+  );
 };
