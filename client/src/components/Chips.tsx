@@ -12,17 +12,19 @@ export const Chips: React.FC<{
   onChipClick: (chip: string) => void;
 }> = ({ chips = defaultChips, onChipClick }) => {
   return (
-    <ul className="flex w-full gap-2">
-      {chips.map((chip) => (
-        <button
-          role="listitem"
-          key={chip}
-          onClick={() => onChipClick(chip)}
-          className="badge py-3"
-        >
-          {chip}
-        </button>
-      ))}
+    <div className="flex flex-nowrap gap-4 sm:flex-col">
+      <ul className="flex w-full flex-1 gap-2">
+        {chips.map((chip) => (
+          <button
+            role="listitem"
+            key={chip}
+            onClick={() => onChipClick(chip)}
+            className="badge py-3"
+          >
+            {chip}
+          </button>
+        ))}
+      </ul>
       <div className="ml-auto flex gap-2">
         <label
           key="clear"
@@ -35,13 +37,12 @@ export const Chips: React.FC<{
         <label
           key="saved"
           role="listitem"
-          onClick={() => onChipClick("")}
           htmlFor="queries-drawer"
-          className="badge drawer-button py-3"
+          className="drawer-button badge py-3"
         >
           Saved
         </label>
       </div>
-    </ul>
+    </div>
   );
 };

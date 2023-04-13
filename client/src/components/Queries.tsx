@@ -15,7 +15,7 @@ const Query: React.FC<{
     className="card bg-neutral p-4 text-neutral-content shadow-xl"
     onClick={() => onQueryClick(query)}
   >
-    <p>{query}</p>
+    {query}
   </a.li>
 );
 
@@ -28,7 +28,7 @@ export const Queries: React.FC<QueriesProps> = ({ queries, onQueryClick }) => {
   });
 
   return (
-    <div className="drawer-side">
+    <>
       <label htmlFor="queries-drawer" className="drawer-overlay"></label>
       <div className="min-w-md flex flex-col gap-4 bg-base-100">
         <h2 className="text-2xl font-bold">Saved queries</h2>
@@ -49,6 +49,6 @@ export const Queries: React.FC<QueriesProps> = ({ queries, onQueryClick }) => {
           )}
         </div>
       </div>
-    </div>
+    </>
   );
 };
