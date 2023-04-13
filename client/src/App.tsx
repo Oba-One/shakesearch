@@ -6,11 +6,12 @@ import { Queries } from "./components/Queries";
 
 import { useSearch } from "./hooks/useSearch";
 
-function App() {
+const App: React.FC = () => {
   const {
     query,
     state,
     savedQueries,
+    handleScroll,
     handleSearchChange,
     handleSetQuery,
     handleSaveQuery,
@@ -29,12 +30,14 @@ function App() {
             onChange={handleSearchChange}
           />
           <Chips onChipClick={handleSetQuery} />
-          <Results {...state} />
+          <Results {...state} handleScroll={handleScroll} />
         </div>
-        <Queries queries={savedQueries} onQueryClick={handleSetQuery} />
+        <div className="drawer-side">
+          <Queries queries={savedQueries} onQueryClick={handleSetQuery} />
+        </div>
       </main>
     </>
   );
-}
+};
 
 export default App;

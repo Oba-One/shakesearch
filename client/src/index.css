@@ -4,6 +4,8 @@
 
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: "UnifrakturCook", cursive;
+  font-family: "Merriweather", serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -22,16 +24,6 @@ body {
 body::-webkit-scrollbar,
 div::-webkit-scrollbar {
   display: none;
-}
-
-h1,
-h2,
-h3 {
-  font-family: "UnifrakturCook", cursive;
-}
-
-p {
-  font-family: "Merriweather", serif;
 }
 
 #root {
