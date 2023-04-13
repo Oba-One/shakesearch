@@ -30,10 +30,10 @@ let db: IDBPDatabase;
 let mounted = false;
 
 async function initDb() {
-  return await openDB("searchDatabase", 2, {
+  return await openDB("searchDatabase", 3, {
     upgrade(db) {
-      db.createObjectStore("searchResults");
-      db.createObjectStore("savedQueries");
+      db.createObjectStore("results");
+      db.createObjectStore("queries");
     },
   });
 }
@@ -43,7 +43,7 @@ async function handleSearch(term: string): Promise<any> {
     db = await initDb();
   }
 
-  const cachedMatches: QueryMatch[] = await db.get("searchResults", term);
+  const cachedMatches: QueryMatch[] = await db.get("results", term);
   if (cachedMatches) {
     return { matches: cachedMatches, loading: false };
   }
@@ -64,7 +64,7 @@ async function handleSearch(term: string): Promise<any> {
 
   // if (response.ok) {
   //   const data: QueryMatch[] = await response.json();
-  //   await db.put("searchResults", data, term);
+  //   await db.put("results", data, term);
 
   //   return {
   //     matches: data,
@@ -140,8 +140,6 @@ export function useSearch() {
   useSubscription<any>(
     observable$,
     (newState) => {
-      console.log("new state", newState);
-
       setState({ ...state, ...newState });
     },
     (e) => console.error(e)
@@ -153,7 +151,7 @@ export function useSearch() {
 
       async function init() {
         db = await initDb();
-        const savedQueries = await db.get("savedQueries", "savedQueries");
+        const savedQueries = await db.get("queries", "queries");
         if (savedQueries) {
           setSavedQueries(savedQueries);
         }
@@ -163,8 +161,7 @@ export function useSearch() {
     }
 
     return () => {
-      db && db.put("savedQueries", savedQueries, "savedQueries");
-      searchSubject.unsubscribe();
+      db && db.put("queries", savedQueries, "queries");
     };
   }, []);
 

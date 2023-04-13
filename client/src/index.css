@@ -4,7 +4,6 @@
 
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -20,8 +19,19 @@ body {
   scrollbar-width: none; /* Firefox */
 }
 
-body::-webkit-scrollbar {
+body::-webkit-scrollbar,
+div::-webkit-scrollbar {
   display: none;
+}
+
+h1,
+h2,
+h3 {
+  font-family: "UnifrakturCook", cursive;
+}
+
+p {
+  font-family: "Merriweather", serif;
 }
 
 #root {
@@ -29,6 +39,10 @@ body::-webkit-scrollbar {
   flex-direction: column;
   height: inherit;
   width: inherit;
+}
+
+.drawer-toggle:checked ~ .drawer-content {
+  --tw-translate-x: 0rem !important;
 }
 
 .logo:hover {

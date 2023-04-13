@@ -36,7 +36,8 @@ export const Chips: React.FC<{
           key="saved"
           role="listitem"
           onClick={() => onChipClick("")}
-         htmlFor="my-drawer-4" className="drawer-button badge py-3"
+          htmlFor="queries-drawer"
+          className="badge drawer-button py-3"
         >
           Saved
         </label>

@@ -61,7 +61,7 @@ export const Results: React.FC<SearchState> = ({
     success: noResults ? (
       <div> No results for this search </div>
     ) : (
-      <ul className="grid grid-cols-[repeat(auto-fit,_minmax(380px,_1fr))] gap-6">
+      <ul className="grid grid-cols-[repeat(auto-fit,_minmax(380px,_1fr))] gap-6 pb-36">
         {trail.map((style, index) => (
           <Result
             key={matches[index].excerpt}
@@ -75,7 +75,7 @@ export const Results: React.FC<SearchState> = ({
   };
 
   return (
-    <div className="grid h-full w-full flex-1 place-items-center">
+    <div className="pb- grid h-full w-full flex-1 place-items-center">
       {Content[status]}
     </div>
   );
