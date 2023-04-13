@@ -151,9 +151,9 @@ type Searcher struct {
 }
 
 type SearchResult struct {
-    Excerpt string
-		Match   string
-    Weight  int
+    Excerpt string `json:"excerpt"`
+		Match   string `json:"match"`
+    Weight  int    `json:"weight"`
 }
 
 type CacheEntry struct {
