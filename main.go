@@ -13,11 +13,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/labstack/echo/v4"
-	"github.com/schollz/closestmatch"
-	"github.com/texttheater/golang-levenshtein/levenshtein"
+	"github.com/lithammer/fuzzysearch/fuzzy"
 )
 
 func main() {
@@ -50,19 +50,24 @@ func handleSearch(searcher Searcher) echo.HandlerFunc {
 		}
 
 		if page < 1 {
-		  return c.String(http.StatusBadRequest, "invalid page number")
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid page number"})
 		}
-	
+
 		if query == "" {
-			return c.String(http.StatusBadRequest, "missing search query in URL params")
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Missing search query in URL params"})
 		}
 
 		searchResults := searcher.Search(query)
+
+		if len(searchResults) == 0 {
+			return c.JSON(http.StatusNotFound, map[string]string{"error": "No results found"})
+		}
+
 		totalResults := len(searchResults)
 		totalPages := (totalResults + pageSize - 1) / pageSize
 
 		if page > totalPages {
-			return c.String(http.StatusNotFound, "no more results available")
+			return c.JSON(http.StatusNotFound, map[string]string{"error": "No more results available"})
 		}
 
 		start := (page - 1) * pageSize
@@ -77,59 +82,52 @@ func handleSearch(searcher Searcher) echo.HandlerFunc {
 		enc := json.NewEncoder(buf)
 		err = enc.Encode(paginatedResults)
 		if err != nil {
-			return c.String(http.StatusInternalServerError, "encoding failure")
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Encoding failure"})
 		}
 
 		return c.JSONBlob(http.StatusOK, buf.Bytes())
 	}
 }
 
-func (s *Searcher) Search(query string) []SearchResult {
-	cacheKey := strings.ToLower(query)
+func (s *Searcher) Search(q string) []SearchResult {
+	query := preprocessText(q)
 	cacheTimeout := 5 * time.Minute
-	query = cacheKey
 
-	if value, ok := s.Cache.Get(cacheKey); ok {
+	if value, ok := s.Cache.Get(query); ok {
 		cacheEntry := value
 		if time.Since(cacheEntry.Time) < cacheTimeout {
 			return cacheEntry.Results
 		}
 	}
 
-	const maxResults = 10
-	closestQueries := s.ClosestMatch.ClosestN(query, maxResults)
 	results := []SearchResult{}
+	uniqueMatches := make(map[string]struct{})
 
-	for _, closestQuery := range closestQueries {
-		idxs := s.SuffixArray.Lookup([]byte(closestQuery), -1)
+	// Search for the entire query (exact match)
+	idxs := s.SuffixArray.Lookup([]byte(query), -1)
+	findMatches(query, idxs, s.CompleteWorks, 0, &results, uniqueMatches)
 
-		for _, idx := range idxs {
-			start := idx - 250
-			if start < 0 {
-				start = 0  // stay in bounds
-			}
-			end := idx + 250
-			if end > len(s.CompleteWorks) {
-				end = len(s.CompleteWorks) // stay in bounds
-			}
-			excerpt := s.CompleteWorks[start:end]
+	// Search for fuzzy matches
+	distanceThreshold := int(float64(len(query)) * 0.2)
+	fuzzyMatches := fuzzy.RankFind(query, s.Words)
+	for _, match := range fuzzyMatches {
+		distance := match.Distance
 
-			distance := levenshtein.DistanceForStrings([]rune(query), []rune(closestQuery), levenshtein.DefaultOptions)
-
-			result := SearchResult{
-				Excerpt: excerpt,
-				Match:   closestQuery,
-				Weight:  distance,
-			}
-			results = append(results, result)
+		// Skip results that exceed the distance threshold
+		if distance > distanceThreshold {
+			continue
 		}
+
+		phrase := match.Target
+		idxs := s.SuffixArray.Lookup([]byte(phrase), -1)
+		findMatches(phrase, idxs, s.CompleteWorks, distance, &results, uniqueMatches)
 	}
 
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Weight < results[j].Weight
 	})
 
-	s.Cache.Add(cacheKey, CacheEntry{
+	s.Cache.Add(query, CacheEntry{
 		Results: results,
 		Time:    time.Now(),
 	})
@@ -138,34 +136,66 @@ func (s *Searcher) Search(query string) []SearchResult {
 }
 
 func (s *Searcher) Load(filename string) error {
- dat, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return fmt.Errorf("Load: %w", err)
+    dat, err := ioutil.ReadFile(filename)
+    if err != nil {
+        return fmt.Errorf("Load: %w", err)
+    }
+
+    s.CompleteWorks = string(dat)
+    s.CompleteWorksLowercase = preprocessText(s.CompleteWorks)
+
+    // Create a list of lowercase words
+    wordPattern := regexp.MustCompile(`\w+`)
+    words := wordPattern.FindAllString(s.CompleteWorksLowercase, -1)
+    s.Words = words
+
+    s.SuffixArray = suffixarray.New([]byte(s.CompleteWorksLowercase))
+
+    cacheSize := 100
+    cache, err := lru.New[string, CacheEntry](cacheSize)
+    if err != nil {
+        return fmt.Errorf("Load: %w", err)
+    }
+    s.Cache = cache
+
+    return nil
+}
+
+func findMatches(query string, idxs []int, completeWorks string, distance int, results *[]SearchResult, uniqueMatches map[string]struct{}) {
+	for _, idx := range idxs {
+		start := idx - 250
+		if start < 0 {
+			start = 0 // stay in bounds
+		}
+		end := idx + 250
+		if end > len(completeWorks) {
+			end = len(completeWorks) // stay in bounds
+		}
+		excerpt := completeWorks[start:end]
+
+		if _, exists := uniqueMatches[excerpt]; !exists {
+			uniqueMatches[excerpt] = struct{}{}
+			result := SearchResult{
+				Excerpt: excerpt,
+				Match:   query,
+				Weight:  distance,
+			}
+			*results = append(*results, result)
+		}
 	}
+}
 
-	s.CompleteWorks = string(dat)
-	s.CompleteWorksLowercase = strings.ToLower(string(dat))
+func preprocessText(text string) string {
+    text = strings.Map(func(r rune) rune {
+        if unicode.IsPunct(r) {
+            return -1
+        }
+        return r
+    }, text)
+    text = strings.ToLower(text)
+    text = strings.Join(strings.Fields(text), " ")
 
-	// Create a list of lowercase words
-	wordPattern := regexp.MustCompile(`\w+`)
-	words := wordPattern.FindAllString(s.CompleteWorksLowercase, -1)
-	s.Words = words
-
-	s.SuffixArray = suffixarray.New([]byte(s.CompleteWorksLowercase))
-
-	cacheSize := 100
-	cache, err := lru.New[string, CacheEntry](cacheSize)
-	if err != nil {
-		return fmt.Errorf("Load: %w", err)
-	}
-	s.Cache = cache
-
-	// Prepare closestmatch
-	bagSizes := []int{2, 3, 4}
-	cmBuilder := closestmatch.New(s.Words, bagSizes)
-	s.ClosestMatch = cmBuilder
-
-	return nil
+    return text
 }
 
 type Searcher struct {
@@ -174,7 +204,6 @@ type Searcher struct {
 	Words                  []string
 	SuffixArray   				 *suffixarray.Index
 	Cache         				 *lru.Cache[string, CacheEntry]
-	ClosestMatch           *closestmatch.ClosestMatch
 }
 
 type SearchResult struct {
