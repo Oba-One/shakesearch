@@ -4,20 +4,16 @@ import { a } from "@react-spring/web";
 export function getHighlightedText(text: string, highlight: string) {
   const parts = text.split(new RegExp(`(${highlight})`, "gi"));
   return (
-    <span>
+    <p className='antialiased tracking-wide'>
       {parts.map((part: string, i: Key | null | undefined) => (
         <span
           key={i}
-          style={
-            part.toLowerCase() === highlight.toLowerCase()
-              ? { fontWeight: "bold" }
-              : {}
-          }
+          className={`${ part.toLowerCase() === highlight.toLowerCase() ? "bg-yellow-300 font-semibold" : "" }`}
         >
           {part}
         </span>
       ))}
-    </span>
+    </p>
   );
 }
 
@@ -30,7 +26,7 @@ export const Result: React.FC<{
   <a.li style={style}>
     <label
       htmlFor="result-dialog"
-      className="card bg-neutral p-4 text-neutral-content shadow-xl"
+      className="card px-4 !py-3 text-black shadow-lg font-light cursor-pointer"
       onClick={() => onCardClick({ excerpt, match })}
     >
       {getHighlightedText(excerpt, match)}

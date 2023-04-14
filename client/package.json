@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite --port 3023 --host",
     "dev:go": "yarn build --watch",
-    "test": "jest",
-    "test:coverage": "jest --coverage",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
@@ -19,45 +20,24 @@
     "rxjs": "7.8.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^5.16.4",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^14.4.3",
+    "@vitejs/plugin-react": "^2.2.0",
+    "@vitest/coverage-c8": "^0.24.5",
+    "@vitest/ui": "latest",
     "@types/react": "^18.0.35",
     "@types/react-dom": "^18.0.11",
     "@vitejs/plugin-react-swc": "^3.3.0",
     "autoprefixer": "^10.4.14",
+    "fake-indexeddb": "4.0.1",
     "daisyui": "2.51.5",
     "postcss": "^8.4.21",
     "sass": "1.62.0",
     "tailwindcss": "^3.3.1",
-    "vite": "^4.2.1"
-  },
-  "jest": {
-    "collectCoverageFrom": [
-      "src/**/*.{js,jsx,ts,tsx}",
-      "!src/**/*.d.ts"
-    ],
-    "clearMocks": true,
-    "setupFilesAfterEnv": [
-      "<rootDir>/src/setupTests.ts"
-    ],
-    "testEnvironment": "jest-environment-jsdom",
-    "transform": {
-      "^.+\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$": "<rootDir>/__tests__/__mocks__/fileTransform.cjs",
-      "^.+\\.(css|scss|sass|less)$": "<rootDir>/__tests__/__mocks__/cssTransform.cjs",
-      "^.+\\.(t|j)sx?$": [
-        "@swc/jest",
-        {
-          "jsc": {
-            "parser": {
-              "syntax": "ecmascript",
-              "jsx": true
-            },
-            "transform": {
-              "react": {
-                "runtime": "automatic"
-              }
-            }
-          }
-        }
-      ]
-    }
+    "jsdom": "latest",
+    "vite": "latest",
+    "vitest": "latest",
+    "typescript": "5.0.4"
   }
 }

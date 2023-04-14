@@ -64,8 +64,8 @@ export const Results: React.FC<ResultsProps> = ({
                 onCardClick={setDialogData}
               />
             ))}
-            <div ref={lastResultRef} style={{ visibility: "hidden" }}>
-              Loading...
+            <div ref={lastResultRef} className='invisible'>
+              Loading more...
             </div>
           </ul>
         )}
@@ -83,13 +83,13 @@ export const Results: React.FC<ResultsProps> = ({
   };
 
   return (
-    <div className="pb- grid h-full w-full flex-1 place-items-center">
+    <div className="grid h-full w-full flex-1 place-items-center">
       {renderContent()}
       {createPortal(
         <>
           <input type="checkbox" id="result-dialog" className="modal-toggle" />
           <label htmlFor="result-dialog" className="modal cursor-pointer">
-            <label className="modal-box relative" htmlFor="">
+            <label className="modal-box relative text-2xl font-normal" htmlFor="">
               {getHighlightedText(excerpt, match)}
             </label>
           </label>

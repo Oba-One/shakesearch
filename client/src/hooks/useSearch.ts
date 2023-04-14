@@ -1,9 +1,9 @@
 import {
   filter,
   switchMap,
-  catchError,
   debounceTime,
   distinctUntilChanged,
+  catchError,
 } from "rxjs/operators";
 import { IDBPDatabase, openDB } from "idb";
 import { useEffect, useState, useCallback } from "react";
@@ -47,7 +47,6 @@ async function handleSearch(term: string, page: number): Promise<SearchState> {
 
   const cachedMatches: QueryMatch[] = await db.get("results", cacheKey);
   if (cachedMatches) {
-    console.log("Cache hit");
     return { matches: cachedMatches, loading: false, page };
   }
 
@@ -57,7 +56,7 @@ async function handleSearch(term: string, page: number): Promise<SearchState> {
       "Content-Type": "application/json",
     },
     credentials: "same-origin",
-  });
+  })
 
   if (response.ok) {
     const data: QueryMatch[] = await response.json();
@@ -65,8 +64,6 @@ async function handleSearch(term: string, page: number): Promise<SearchState> {
     db.put("results", data, cacheKey).catch((e) => {
       console.error("Error caching", e);
     });
-
-    console.log("Cache miss");
 
     return {
       matches: data,
@@ -76,12 +73,11 @@ async function handleSearch(term: string, page: number): Promise<SearchState> {
     };
   }
 
-  console.log("Error", response.status, response.statusText);
-
   return response.json().then((data) => ({
     matches: [],
     loading: false,
     error: data.error,
+    noMoreResults: data.error === "No more results available",
     page
   }));
 }
@@ -97,14 +93,14 @@ const observable$ = searchSubject.pipe(
   debounceTime(200), // only emit value after 400ms pause in events
   switchMap(({ term, page }) =>
     merge(
-      of({ loading: true, error: "", noResults: false }),
+      of({ loading: true, error: "", noResults: false, matches: [] }),
       from(handleSearch(term.trim(), page))
     )
   ),
-  catchError(async (e) => ({
-    loading: false,
-    error: "An application error occured",
-  })) // catch any errors and return a new observable
+  catchError((e, caught) => {
+    console.error(e);
+    return caught;
+  })
 );
 
 export function useSearch() {
@@ -153,10 +149,16 @@ export function useSearch() {
 
   useSubscription<any>(
     observable$,
-    (newState) => {
-      if (newState.matches && state.page > 1) {
+    (newState: SearchState) => {
+      console.log("State", {
+        old: state,
+        new: newState,
+      });
+      
+      if (newState.matches && state.page > 1 || (newState.noMoreResults && state.matches.length > 0)) {
         newState.matches = [...state.matches, ...newState.matches];
       }
+
       setState((prevState) => ({
         ...prevState,
         ...newState,
@@ -172,13 +174,9 @@ export function useSearch() {
       async function init() {
         db = await initDb();
 
-        console.log("Initialized db");
-
-        const savedQueries = await db.get("queries", "queries");
+        const savedQueries: Map<string, string> = await db.get("queries", "queries");
         if (savedQueries) {
-          console.log("Loaded saved queries");
-
-          setSavedQueries(savedQueries);
+          setSavedQueries(new Map(savedQueries));
         }
       }
 
@@ -189,7 +187,7 @@ export function useSearch() {
       db &&
         db.put("queries", savedQueries, "queries").catch((e) => {
           console.error("Error caching", e);
-        });
+        })
     };
   }, []);
 

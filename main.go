@@ -51,6 +51,17 @@ const	cacheTimeout = 5 * time.Minute
 func handleSearch(searcher Searcher) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		query := c.QueryParam("q")
+
+		if len(query) < 1 || len(query) > 1000 {
+    	return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid query length"})
+		}
+
+		var validChars = regexp.MustCompile(`^[a-zA-Z0-9\s.,;:!?'-]+$`)
+
+		if !validChars.MatchString(query) {
+				return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid characters in query"})
+		}
+
 		pageParam := c.QueryParam("page")
 		page, err := strconv.Atoi(pageParam)
 		if err != nil {
@@ -75,7 +86,7 @@ func handleSearch(searcher Searcher) echo.HandlerFunc {
 		totalPages := (totalResults + pageSize - 1) / pageSize
 
 		if page > totalPages {
-			return c.JSON(http.StatusNotFound, map[string]string{"error": "No more results available"})
+			return c.JSON(http.StatusOK, map[string]string{"error": "No more results available"})
 		}
 
 		start := (page - 1) * pageSize
@@ -98,7 +109,7 @@ func handleSearch(searcher Searcher) echo.HandlerFunc {
 }
 
 func (s *Searcher) Search(q string) []SearchResult {
-	query := preprocessQuery(q)
+	query := strings.ToLower(q)
 
 	// CHECK CACHE
 	if value, ok := s.Cache.Get(query); ok {
@@ -185,19 +196,6 @@ func findMatches(query string, idxs []int, completeWorks string, distance int, r
 			*results = append(*results, result)
 		}
 	}
-}
-
-func preprocessQuery(text string) string {
-    // text = strings.Map(func(r rune) rune {
-    //     if unicode.IsPunct(r) {
-    //         return -1
-    //     }
-    //     return r
-    // }, text)
-    text = strings.ToLower(text)
-    // text = strings.Join(strings.Fields(text), " ")
-
-    return text
 }
 
 type Searcher struct {

@@ -1,7 +1,6 @@
 const defaultChips = [
   "Hamlet",
   "Macbeth",
-  "Romeo and Juliet",
   "A horse! a horse!",
   "To be, or not to be, that is the question",
 ];
@@ -11,25 +10,24 @@ export const Chips: React.FC<{
   onChipClick: (chip: string) => void;
 }> = ({ chips = defaultChips, onChipClick }) => {
   return (
-    <div className="flex flex-nowrap gap-4 sm:flex-col">
-      <ul className="flex w-full flex-1 gap-2">
+    <div className="flex flex-col lg:flex-row items-center md:flex-nowrap lg:justify-between gap-4 ">
+      <ul className="flex flex-1 nowrap gap-2">
         {chips.map((chip) => (
-          <button
-            role="listitem"
+          <li
             key={chip}
             onClick={() => onChipClick(chip)}
-            className="badge py-3"
+            className="badge badge-lg cursor-pointer text-black px-4 line-clamp-1 font-medium shrink opacity-80 transfrom-opacity duration-300 ease-in-out hover:opacity-100"
           >
             {chip}
-          </button>
+          </li>
         ))}
       </ul>
-      <div className="ml-auto flex gap-2">
+      <div className=" flex gap-2">
         <label
           key="clear"
           role="listitem"
           onClick={() => onChipClick("")}
-          className="badge py-3"
+          className="btn btn-sm btn-outline btn-secondary "
         >
           Clear
         </label>
@@ -37,7 +35,7 @@ export const Chips: React.FC<{
           key="saved"
           role="listitem"
           htmlFor="queries-drawer"
-          className="badge drawer-button py-3"
+          className="btn btn-sm btn-accent drawer-button "
         >
           Saved
         </label>
