@@ -23,6 +23,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.2
 	github.com/joho/godotenv v1.5.1
 	github.com/lithammer/fuzzysearch v1.1.5
+	github.com/sajari/fuzzy v1.0.0
 	github.com/schollz/closestmatch v2.1.0+incompatible
 	github.com/stretchr/testify v1.8.2
 	github.com/texttheater/golang-levenshtein/levenshtein v0.0.0-20200805054039-cae8b0eaed6c

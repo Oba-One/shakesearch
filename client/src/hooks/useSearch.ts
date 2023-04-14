@@ -6,7 +6,7 @@ import {
   distinctUntilChanged,
 } from "rxjs/operators";
 import { IDBPDatabase, openDB } from "idb";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { BehaviorSubject, from, merge, of } from "rxjs";
 
 import { useSubscription } from "./useSubscribtion";
@@ -20,6 +20,7 @@ export interface QueryMatch {
 export interface SearchState {
   matches: QueryMatch[];
   loading: boolean;
+  page: number;
   error?: string;
   noResults?: boolean;
   noMoreResults?: boolean;
@@ -47,7 +48,7 @@ async function handleSearch(term: string, page: number): Promise<SearchState> {
   const cachedMatches: QueryMatch[] = await db.get("results", cacheKey);
   if (cachedMatches) {
     console.log("Cache hit");
-    return { matches: cachedMatches, loading: false };
+    return { matches: cachedMatches, loading: false, page };
   }
 
   const response = await fetch(`/search?q=${term}&page=${page}`, {
@@ -71,6 +72,7 @@ async function handleSearch(term: string, page: number): Promise<SearchState> {
       matches: data,
       loading: false,
       noResults: data.length === 0,
+      page: page + 1
     };
   }
 
@@ -80,6 +82,7 @@ async function handleSearch(term: string, page: number): Promise<SearchState> {
     matches: [],
     loading: false,
     error: data.error,
+    page
   }));
 }
 
@@ -105,15 +108,14 @@ const observable$ = searchSubject.pipe(
 );
 
 export function useSearch() {
-  const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
-  const loadingRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<SearchState>({
     matches: [],
     loading: false,
     error: "",
     noResults: false,
     noMoreResults: false,
+    page: 1, // Move the page state into the state object
   });
   const [savedQueries, setSavedQueries] = useState<Map<string, string>>(
     new Map()
@@ -144,20 +146,26 @@ export function useSearch() {
     });
   }
 
+  const handleLoadMoreResults = useCallback(() => {
+    console.log("Loading more results");
+    searchSubject.next({ term: query, page: state.page + 1 });
+  }, [query, state.page]); // Update the dependency array
+
   useSubscription<any>(
     observable$,
     (newState) => {
-      if (newState.matches && page > 1) {
+      if (newState.matches && state.page > 1) {
         newState.matches = [...state.matches, ...newState.matches];
       }
-      setState({ ...state, ...newState });
+      setState((prevState) => ({
+        ...prevState,
+        ...newState,
+      }));
     },
     (e) => console.error(e)
   );
 
   useEffect(() => {
-    let observer: IntersectionObserver;
-
     if (!mounted) {
       mounted = true;
 
@@ -175,22 +183,6 @@ export function useSearch() {
       }
 
       init();
-
-      observer = new IntersectionObserver(
-        (entries) => {
-          if (entries[0].isIntersecting) {
-            console.log("Loading more results");
-
-            setPage((prevPage) => prevPage + 1);
-            searchSubject.next({ term: query, page: page + 1 });
-          }
-        },
-        { threshold: 1 }
-      );
-
-      if (loadingRef.current) {
-        observer.observe(loadingRef.current);
-      }
     }
 
     return () => {
@@ -198,20 +190,16 @@ export function useSearch() {
         db.put("queries", savedQueries, "queries").catch((e) => {
           console.error("Error caching", e);
         });
-
-      if (loadingRef.current) {
-        observer.unobserve(loadingRef.current);
-      }
     };
   }, []);
 
   return {
     state,
     query,
-    loadingRef,
     savedQueries,
     handleSetQuery,
     handleSearchChange,
     handleSaveQuery,
+    handleLoadMoreResults,
   };
 }

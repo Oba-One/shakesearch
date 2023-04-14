@@ -14,7 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/joho/godotenv"
@@ -28,7 +27,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	
 	
 	e := echo.New()
 	
@@ -48,6 +46,7 @@ func main() {
 }
 
 const pageSize = 20
+const	cacheTimeout = 5 * time.Minute
 
 func handleSearch(searcher Searcher) echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -99,9 +98,9 @@ func handleSearch(searcher Searcher) echo.HandlerFunc {
 }
 
 func (s *Searcher) Search(q string) []SearchResult {
-	query := preprocessText(q)
-	cacheTimeout := 5 * time.Minute
+	query := preprocessQuery(q)
 
+	// CHECK CACHE
 	if value, ok := s.Cache.Get(query); ok {
 		cacheEntry := value
 		if time.Since(cacheEntry.Time) < cacheTimeout {
@@ -112,30 +111,24 @@ func (s *Searcher) Search(q string) []SearchResult {
 	results := []SearchResult{}
 	uniqueMatches := make(map[string]struct{})
 
-	// Search for the entire query (exact match)
+	// FIND EXACT MATCHES
 	idxs := s.SuffixArray.Lookup([]byte(query), -1)
 	findMatches(query, idxs, s.CompleteWorks, 0, &results, uniqueMatches)
 
-	// Search for fuzzy matches
-	distanceThreshold := int(float64(len(query)) * 0.2)
-	fuzzyMatches := fuzzy.RankFind(query, s.Words)
+	// FIND FUZZY MATCHES
+	fuzzyMatches := fuzzy.RankFindFold(query, s.Words)
 	for _, match := range fuzzyMatches {
-		distance := match.Distance
-
-		// Skip results that exceed the distance threshold
-		if distance > distanceThreshold {
-			continue
-		}
-
 		phrase := match.Target
 		idxs := s.SuffixArray.Lookup([]byte(phrase), -1)
-		findMatches(phrase, idxs, s.CompleteWorks, distance, &results, uniqueMatches)
+		findMatches(phrase, idxs, s.CompleteWorks, match.Distance, &results, uniqueMatches)
 	}
 
+	// SORT RESULTS
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Weight < results[j].Weight
 	})
 
+	// CACHE RESULTS
 	s.Cache.Add(query, CacheEntry{
 		Results: results,
 		Time:    time.Now(),
@@ -145,21 +138,21 @@ func (s *Searcher) Search(q string) []SearchResult {
 }
 
 func (s *Searcher) Load(filename string) error {
+		// LOAD SHAKESPEARE'S WORKS
     dat, err := ioutil.ReadFile(filename)
     if err != nil {
         return fmt.Errorf("Load: %w", err)
     }
 
+		// PREPROCESS WORKS
     s.CompleteWorks = string(dat)
-    s.CompleteWorksLowercase = preprocessText(s.CompleteWorks)
-
-    // Create a list of lowercase words
+    s.CompleteWorksLowercase = strings.ToLower(s.CompleteWorks)
     wordPattern := regexp.MustCompile(`\w+`)
     words := wordPattern.FindAllString(s.CompleteWorksLowercase, -1)
     s.Words = words
-
     s.SuffixArray = suffixarray.New([]byte(s.CompleteWorksLowercase))
 
+		// INITIALIZE CACHE
     cacheSize := 100
     cache, err := lru.New[string, CacheEntry](cacheSize)
     if err != nil {
@@ -194,15 +187,15 @@ func findMatches(query string, idxs []int, completeWorks string, distance int, r
 	}
 }
 
-func preprocessText(text string) string {
-    text = strings.Map(func(r rune) rune {
-        if unicode.IsPunct(r) {
-            return -1
-        }
-        return r
-    }, text)
+func preprocessQuery(text string) string {
+    // text = strings.Map(func(r rune) rune {
+    //     if unicode.IsPunct(r) {
+    //         return -1
+    //     }
+    //     return r
+    // }, text)
     text = strings.ToLower(text)
-    text = strings.Join(strings.Fields(text), " ")
+    // text = strings.Join(strings.Fields(text), " ")
 
     return text
 }

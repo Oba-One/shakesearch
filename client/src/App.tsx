@@ -10,11 +10,11 @@ const App: React.FC = () => {
   const {
     query,
     state,
-    loadingRef,
     savedQueries,
     handleSearchChange,
     handleSetQuery,
     handleSaveQuery,
+    handleLoadMoreResults,
   } = useSearch();
 
   return (
@@ -30,7 +30,7 @@ const App: React.FC = () => {
             onChange={handleSearchChange}
           />
           <Chips onChipClick={handleSetQuery} />
-          <Results {...state} loadingRef={loadingRef} />
+          <Results {...state} loadMoreResults={handleLoadMoreResults} />
         </div>
         <div className="drawer-side">
           <Queries queries={savedQueries} onQueryClick={handleSetQuery} />

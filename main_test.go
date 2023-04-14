@@ -21,7 +21,9 @@ func TestLoad(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, searcher.SuffixArray)
 	assert.NotNil(t, searcher.Cache)
-	assert.NotNil(t, searcher.ClosestMatch)
+	assert.NotNil(t, searcher.Words)
+	assert.NotNil(t, searcher.CompleteWorks)
+	assert.NotNil(t, searcher.CompleteWorksLowercase)
 }
 
 func TestLoadInvalidFile(t *testing.T) {
@@ -159,6 +161,63 @@ func TestThouSearch(t *testing.T) {
 	assert.True(t, len(results) > 0, "Expected at least one search result")
 }
 
+func TestHorseSearch(t *testing.T) {
+	searcher := Searcher{}
+	err := searcher.Load("completeworks.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	e := echo.New()
+	q := make(url.Values)
+	q.Set("q", "A horse! A horse!")
+	req := httptest.NewRequest(http.MethodGet, "/search?" + q.Encode(), nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+  handleSearch(searcher)(c)
+	t.Log(rec.Body.String())
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	contentType := rec.Header().Get("Content-Type")
+	assert.Equal(t, "application/json; charset=UTF-8", contentType)
+
+	var results []SearchResult
+	err = json.Unmarshal(rec.Body.Bytes(), &results)
+	assert.NoError(t, err, "Failed to parse response JSON")
+	assert.True(t, len(results) == 2, "Expected 2 search result")
+}
+
+// Add for different puncutations
+func TestToBeOrNotToBeSearch(t *testing.T) {
+	searcher := Searcher{}
+	err := searcher.Load("completeworks.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	e := echo.New()
+	q := make(url.Values)
+	q.Set("q", "To be, or not to be, that is the question")
+	req := httptest.NewRequest(http.MethodGet, "/search?" + q.Encode(), nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+  handleSearch(searcher)(c)
+	t.Log(rec.Body.String())
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	contentType := rec.Header().Get("Content-Type")
+	assert.Equal(t, "application/json; charset=UTF-8", contentType)
+
+	var results []SearchResult
+	err = json.Unmarshal(rec.Body.Bytes(), &results)
+	assert.NoError(t, err, "Failed to parse response JSON")
+	assert.True(t, len(results) == 1, "Expected 2 search result")
+}
+
 func TestUpperCaseHamLetSearch(t *testing.T) {
 	searcher := Searcher{}
 	err := searcher.Load("completeworks.txt")
@@ -188,6 +247,7 @@ func TestUpperCaseHamLetSearch(t *testing.T) {
 	assert.True(t, len(results) > 0, "Expected at least one search result")
 }
 
+// Fix kind of determine mispelling
 func TestMispellingSearch(t *testing.T) {
 	searcher := Searcher{}
 	err := searcher.Load("completeworks.txt")
@@ -197,7 +257,7 @@ func TestMispellingSearch(t *testing.T) {
 
 	e := echo.New()
 	q := make(url.Values)
-	q.Set("q", "macbetg")
+	q.Set("q", "macbth")
 	req := httptest.NewRequest(http.MethodGet, "/search?" + q.Encode(), nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
@@ -263,8 +323,41 @@ func TestNoMoreResultsAvailable(t *testing.T) {
 
 	handleSearch(searcher)(c)
 
+	var jsonResponse map[string]string
+	err = json.Unmarshal(rec.Body.Bytes(), &jsonResponse)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal JSON: %v", err)
+	}
+
 	assert.Equal(t, http.StatusNotFound, rec.Code)
-	assert.Equal(t, "no more results available", strings.TrimSpace(rec.Body.String()))
+	assert.Equal(t, "No more results available", jsonResponse["error"])
+}
+
+func TestNoResultsFound(t *testing.T) {
+	searcher := Searcher{}
+	err := searcher.Load("completeworks.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	e := echo.New()
+	q := make(url.Values)
+	q.Set("q", "ghjtls")
+	q.Set("page", "1")
+	req := httptest.NewRequest(http.MethodGet, "/search?" + q.Encode(), nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	handleSearch(searcher)(c)
+
+	var jsonResponse map[string]string
+	err = json.Unmarshal(rec.Body.Bytes(), &jsonResponse)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal JSON: %v", err)
+	}
+
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+	assert.Equal(t, "No results found", jsonResponse["error"])
 }
 
 func TestPagination(t *testing.T) {
@@ -293,6 +386,7 @@ func TestPagination(t *testing.T) {
 	assert.Equal(t, pageSize, len(results))
 }
 
+// Update to test for JSON response
 func TestNegativePageNumber(t *testing.T) {
 	searcher := Searcher{}
 	err := searcher.Load("completeworks.txt")
@@ -314,6 +408,7 @@ func TestNegativePageNumber(t *testing.T) {
 	assert.Equal(t, "invalid page number", strings.TrimSpace(rec.Body.String()))
 }
 
+// Update to test for JSON response
 func TestZeroPageNumber(t *testing.T) {
 	searcher := Searcher{}
 	err := searcher.Load("completeworks.txt")

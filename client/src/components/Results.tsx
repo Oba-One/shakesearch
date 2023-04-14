@@ -1,31 +1,14 @@
-import { Key, useState } from "react";
-import { a, useTrail } from "@react-spring/web";
+import { useState } from "react";
+import { createPortal } from "react-dom";
+import { useTrail } from "@react-spring/web";
 
 import { SearchState } from "../hooks/useSearch";
-import { createPortal } from "react-dom";
+import useInfiniteScroll from "../hooks/useInfiniteScroll";
+
+import { Result, getHighlightedText } from "./Result";
 
 interface ResultsProps extends SearchState {
-  loadingRef: React.RefObject<HTMLDivElement>;
-}
-
-function getHighlightedText(text: string, highlight: string) {
-  const parts = text.split(new RegExp(`(${highlight})`, "gi"));
-  return (
-    <span>
-      {parts.map((part: string, i: Key | null | undefined) => (
-        <span
-          key={i}
-          style={
-            part.toLowerCase() === highlight.toLowerCase()
-              ? { fontWeight: "bold" }
-              : {}
-          }
-        >
-          {part}
-        </span>
-      ))}
-    </span>
-  );
+  loadMoreResults: () => void;
 }
 
 const Loader = () => (
@@ -38,32 +21,19 @@ const ContentWrapper: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => <div className="grid h-full w-full place-items-center">{children}</div>;
 
-const Result: React.FC<{
-  excerpt: string;
-  match: string;
-  style: any;
-  onCardClick: (excerpt: string) => void;
-}> = ({ excerpt, match, style, onCardClick }) => (
-  <a.li style={style}>
-    <label
-      htmlFor="result-dialog"
-      className="card bg-neutral p-4 text-neutral-content shadow-xl"
-      onClick={() => onCardClick(excerpt)}
-    >
-      {getHighlightedText(excerpt, match)}
-    </label>
-  </a.li>
-);
-
 export const Results: React.FC<ResultsProps> = ({
   matches,
   loading,
   error,
   noResults,
   noMoreResults,
-  loadingRef,
+  loadMoreResults,
 }) => {
-  const [dialogData, setDialogData] = useState("");
+  const [{ match, excerpt }, setDialogData] = useState({
+    excerpt: "",
+    match: "",
+  });
+  const lastResultRef = useInfiniteScroll(loadMoreResults);
 
   const trail = useTrail(matches.length, {
     from: { opacity: 0, transform: "translate3d(0, 40px, 0)" },
@@ -94,7 +64,9 @@ export const Results: React.FC<ResultsProps> = ({
                 onCardClick={setDialogData}
               />
             ))}
-            <div ref={loadingRef} />
+            <div ref={lastResultRef} style={{ visibility: "hidden" }}>
+              Loading...
+            </div>
           </ul>
         )}
         {loading ? (
@@ -118,7 +90,7 @@ export const Results: React.FC<ResultsProps> = ({
           <input type="checkbox" id="result-dialog" className="modal-toggle" />
           <label htmlFor="result-dialog" className="modal cursor-pointer">
             <label className="modal-box relative" htmlFor="">
-              {dialogData}
+              {getHighlightedText(excerpt, match)}
             </label>
           </label>
         </>,

@@ -3,8 +3,7 @@ const defaultChips = [
   "Macbeth",
   "Romeo and Juliet",
   "A horse! a horse!",
-  "If music be the food of love, play on.",
-  "To be, or not to be: that is the question",
+  "To be, or not to be, that is the question",
 ];
 
 export const Chips: React.FC<{
@@ -38,7 +37,7 @@ export const Chips: React.FC<{
           key="saved"
           role="listitem"
           htmlFor="queries-drawer"
-          className="drawer-button badge py-3"
+          className="badge drawer-button py-3"
         >
           Saved
         </label>
