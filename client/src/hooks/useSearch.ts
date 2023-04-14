@@ -1,17 +1,15 @@
 import {
-  map,
   filter,
   switchMap,
   catchError,
   debounceTime,
   distinctUntilChanged,
 } from "rxjs/operators";
-import { useEffect, useState } from "react";
 import { IDBPDatabase, openDB } from "idb";
+import { useEffect, useState, useRef } from "react";
 import { BehaviorSubject, from, merge, of } from "rxjs";
 
 import { useSubscription } from "./useSubscribtion";
-import { mathces as mockMatcges } from "../../mocks.json";
 
 export interface QueryMatch {
   excerpt: string;
@@ -24,6 +22,7 @@ export interface SearchState {
   loading: boolean;
   error?: string;
   noResults?: boolean;
+  noMoreResults?: boolean;
 }
 
 let db: IDBPDatabase;
@@ -38,63 +37,67 @@ async function initDb() {
   });
 }
 
-async function handleSearch(term: string): Promise<any> {
+async function handleSearch(term: string, page: number): Promise<SearchState> {
   if (!db) {
     db = await initDb();
   }
 
-  const cachedMatches: QueryMatch[] = await db.get("results", term);
+  const cacheKey = `${term}-${page}`;
+
+  const cachedMatches: QueryMatch[] = await db.get("results", cacheKey);
   if (cachedMatches) {
+    console.log("Cache hit");
     return { matches: cachedMatches, loading: false };
   }
 
-  return {
-    matches: mockMatcges,
+  const response = await fetch(`/search?q=${term}&page=${page}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "same-origin",
+  });
+
+  if (response.ok) {
+    const data: QueryMatch[] = await response.json();
+
+    db.put("results", data, cacheKey).catch((e) => {
+      console.error("Error caching", e);
+    });
+
+    console.log("Cache miss");
+
+    return {
+      matches: data,
+      loading: false,
+      noResults: data.length === 0,
+    };
+  }
+
+  console.log("Error", response.status, response.statusText);
+
+  return response.json().then((data) => ({
+    matches: [],
     loading: false,
-    noResults: mockMatcges.length === 0,
-  };
-
-  // const response = await fetch(`/search?q=${term}`, {
-  //   method: "GET",
-  //   headers: {
-  //     "Content-Type": "application/json",
-  //   },
-  //   credentials: "same-origin",
-  // });
-
-  // if (response.ok) {
-  //   const data: QueryMatch[] = await response.json();
-  //   await db.put("results", data, term);
-
-  //   return {
-  //     matches: data,
-  //     loading: false,
-  //     noResults: data.length === 0,
-  //   };
-  // }
-
-  // return response.json().then((data) => ({
-  //   matches: [],
-  //   loading: false,
-  //   error: data.error,
-  // }));
-
-  // throw new Error("Not implemented");
+    error: data.error,
+  }));
 }
 
-const searchSubject: BehaviorSubject<string> = new BehaviorSubject("");
+const searchSubject = new BehaviorSubject<{ term: string; page: number }>({
+  term: "",
+  page: 1,
+});
 
 const observable$ = searchSubject.pipe(
-  map((s) => s.trim()), // remove whitespace
   distinctUntilChanged(), // only emit if value is different from previous value
-  filter((s) => s.length >= 3), // only emit if value is at least 3 characters
-  debounceTime(400), // only emit value after 200ms pause in events
-  switchMap((term) =>
+  filter(({ term }) => term.length >= 3), // only emit if value is at least 3 characters
+  debounceTime(200), // only emit value after 400ms pause in events
+  switchMap(({ term, page }) =>
     merge(
       of({ loading: true, error: "", noResults: false }),
-      from(handleSearch(term))
+      from(handleSearch(term.trim(), page))
     )
-  ), // switch to new inner observable each time the value changes
+  ),
   catchError(async (e) => ({
     loading: false,
     error: "An application error occured",
@@ -102,12 +105,15 @@ const observable$ = searchSubject.pipe(
 );
 
 export function useSearch() {
+  const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
+  const loadingRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<SearchState>({
     matches: [],
     loading: false,
     error: "",
     noResults: false,
+    noMoreResults: false,
   });
   const [savedQueries, setSavedQueries] = useState<Map<string, string>>(
     new Map()
@@ -115,12 +121,13 @@ export function useSearch() {
 
   function handleSetQuery(query: string) {
     setQuery(query);
-    searchSubject.next(query);
+    searchSubject.next({ term: query, page: 1 });
   }
 
   function handleSearchChange(event: React.ChangeEvent<HTMLInputElement>) {
-    setQuery(event.target.value);
-    searchSubject.next(event.target.value);
+    const newQuery = event.target.value;
+    setQuery(newQuery);
+    searchSubject.next({ term: newQuery, page: 1 });
   }
 
   function handleSaveQuery(query: string) {
@@ -140,34 +147,68 @@ export function useSearch() {
   useSubscription<any>(
     observable$,
     (newState) => {
+      if (newState.matches && page > 1) {
+        newState.matches = [...state.matches, ...newState.matches];
+      }
       setState({ ...state, ...newState });
     },
     (e) => console.error(e)
   );
 
   useEffect(() => {
+    let observer: IntersectionObserver;
+
     if (!mounted) {
       mounted = true;
 
       async function init() {
         db = await initDb();
+
+        console.log("Initialized db");
+
         const savedQueries = await db.get("queries", "queries");
         if (savedQueries) {
+          console.log("Loaded saved queries");
+
           setSavedQueries(savedQueries);
         }
       }
 
       init();
+
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting) {
+            console.log("Loading more results");
+
+            setPage((prevPage) => prevPage + 1);
+            searchSubject.next({ term: query, page: page + 1 });
+          }
+        },
+        { threshold: 1 }
+      );
+
+      if (loadingRef.current) {
+        observer.observe(loadingRef.current);
+      }
     }
 
     return () => {
-      db && db.put("queries", savedQueries, "queries");
+      db &&
+        db.put("queries", savedQueries, "queries").catch((e) => {
+          console.error("Error caching", e);
+        });
+
+      if (loadingRef.current) {
+        observer.unobserve(loadingRef.current);
+      }
     };
   }, []);
 
   return {
     state,
     query,
+    loadingRef,
     savedQueries,
     handleSetQuery,
     handleSearchChange,

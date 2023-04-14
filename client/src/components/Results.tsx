@@ -5,7 +5,7 @@ import { SearchState } from "../hooks/useSearch";
 import { createPortal } from "react-dom";
 
 interface ResultsProps extends SearchState {
-  handleScroll: (event: React.UIEvent<HTMLUListElement, UIEvent>) => void;
+  loadingRef: React.RefObject<HTMLDivElement>;
 }
 
 function getHighlightedText(text: string, highlight: string) {
@@ -34,9 +34,9 @@ const Loader = () => (
   </div>
 );
 
-const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="grid h-full w-full place-items-center">{children}</div>
-);
+const ContentWrapper: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => <div className="grid h-full w-full place-items-center">{children}</div>;
 
 const Result: React.FC<{
   excerpt: string;
@@ -44,11 +44,12 @@ const Result: React.FC<{
   style: any;
   onCardClick: (excerpt: string) => void;
 }> = ({ excerpt, match, style, onCardClick }) => (
-  <a.li
-    style={style}
-    className="card transform bg-neutral p-4 text-neutral-content shadow-xl transition duration-300 ease-in-out hover:scale-110"
-  >
-    <label htmlFor="result-dialog" onClick={() => onCardClick(excerpt)}>
+  <a.li style={style}>
+    <label
+      htmlFor="result-dialog"
+      className="card bg-neutral p-4 text-neutral-content shadow-xl"
+      onClick={() => onCardClick(excerpt)}
+    >
       {getHighlightedText(excerpt, match)}
     </label>
   </a.li>
@@ -60,7 +61,7 @@ export const Results: React.FC<ResultsProps> = ({
   error,
   noResults,
   noMoreResults,
-  handleScroll,
+  loadingRef,
 }) => {
   const [dialogData, setDialogData] = useState("");
 
@@ -69,41 +70,49 @@ export const Results: React.FC<ResultsProps> = ({
     to: { opacity: 1, transform: "translate3d(0, 0px, 0)" },
   });
 
+  const renderContent = () => {
+    if (noResults) {
+      return loading ? (
+        <Loader />
+      ) : error ? (
+        error
+      ) : (
+        "No results for this search"
+      );
+    }
+
+    return (
+      <>
+        {matches.length > 0 && (
+          <ul className="grid grid-cols-[repeat(auto-fit,_minmax(380px,_1fr))] gap-6 pb-36">
+            {trail.map((style, index) => (
+              <Result
+                key={matches[index].excerpt}
+                style={style}
+                match={matches[index].match}
+                excerpt={matches[index].excerpt}
+                onCardClick={setDialogData}
+              />
+            ))}
+            <div ref={loadingRef} />
+          </ul>
+        )}
+        {loading ? (
+          <ContentWrapper>
+            <Loader />
+          </ContentWrapper>
+        ) : error ? (
+          <ContentWrapper> error</ContentWrapper>
+        ) : noMoreResults ? (
+          <ContentWrapper>No more results</ContentWrapper>
+        ) : null}
+      </>
+    );
+  };
+
   return (
     <div className="pb- grid h-full w-full flex-1 place-items-center">
-      {noResults ? (
-        <Wrapper>
-          {loading ? <Loader /> : error ? error : "No results for this search"}
-        </Wrapper>
-      ) : (
-        <>
-          {matches.length > 0 && (
-            <ul
-              className="grid grid-cols-[repeat(auto-fit,_minmax(380px,_1fr))] gap-6 pb-36"
-              onScroll={handleScroll}
-            >
-              {trail.map((style, index) => (
-                <Result
-                  key={matches[index].excerpt}
-                  style={style}
-                  match={matches[index].match}
-                  excerpt={matches[index].excerpt}
-                  onCardClick={setDialogData}
-                />
-              ))}
-            </ul>
-          )}
-          {loading ? (
-            <Wrapper>
-              <Loader />
-            </Wrapper>
-          ) : error ? (
-            <Wrapper> error</Wrapper>
-          ) : noMoreResults ? (
-            <Wrapper>No more results</Wrapper>
-          ) : null}
-        </>
-      )}
+      {renderContent()}
       {createPortal(
         <>
           <input type="checkbox" id="result-dialog" className="modal-toggle" />
