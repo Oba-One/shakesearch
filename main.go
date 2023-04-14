@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 	"unicode"
 
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/lithammer/fuzzysearch/fuzzy"
 )
@@ -26,16 +28,23 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	
+	
 	e := echo.New()
-
+	
 	e.Static("/", "client/dist")
 	e.GET("/status", func(c echo.Context) error {
-			return c.String(http.StatusOK, "Everything quiet over here.")
+		return c.String(http.StatusOK, "Everything quiet over here.")
 	})
 	e.GET("/search", handleSearch(searcher))
-	
-	e.Logger.Fatal(e.Start("localhost:8080"))		
+
+	err = godotenv.Load(".env")
+	if err != nil {
+		log.Fatalf("Error loading environment variables file")
+	}
+
+	host := os.Getenv("API_HOST")
+	e.Logger.Fatal(e.Start(host))		
 }
 
 const pageSize = 20
