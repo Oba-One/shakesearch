@@ -44,10 +44,8 @@ export const Results: React.FC<ResultsProps> = ({
     if (noResults) {
       return loading ? (
         <Loader />
-      ) : error ? (
-        error
       ) : (
-        "No results for this search"
+        "No results for this search" 
       );
     }
 
@@ -74,7 +72,7 @@ export const Results: React.FC<ResultsProps> = ({
             <Loader />
           </ContentWrapper>
         ) : error ? (
-          <ContentWrapper> error</ContentWrapper>
+          <ContentWrapper>{error}</ContentWrapper>
         ) : noMoreResults ? (
           <ContentWrapper>No more results</ContentWrapper>
         ) : null}
@@ -88,7 +86,7 @@ export const Results: React.FC<ResultsProps> = ({
       {createPortal(
         <>
           <input type="checkbox" id="result-dialog" className="modal-toggle" />
-          <label htmlFor="result-dialog" className="modal cursor-pointer">
+          <label htmlFor="result-dialog" className="modal cursor-pointer" style={{backgroundColor: `rgba(0,0,0,0.75`}}>>
             <label className="modal-box relative text-2xl font-normal" htmlFor="">
               {getHighlightedText(excerpt, match)}
             </label>

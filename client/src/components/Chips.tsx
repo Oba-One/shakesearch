@@ -8,7 +8,8 @@ const defaultChips = [
 export const Chips: React.FC<{
   chips?: string[];
   onChipClick: (chip: string) => void;
-}> = ({ chips = defaultChips, onChipClick }) => {
+  onClearClick: () => void;
+}> = ({ chips = defaultChips, onChipClick, onClearClick }) => {
   return (
     <div className="flex flex-col lg:flex-row items-center md:flex-nowrap lg:justify-between gap-4 ">
       <ul className="flex flex-1 nowrap gap-2">
@@ -26,7 +27,7 @@ export const Chips: React.FC<{
         <label
           key="clear"
           role="listitem"
-          onClick={() => onChipClick("")}
+          onClick={onClearClick}
           className="btn btn-sm btn-outline btn-secondary "
         >
           Clear

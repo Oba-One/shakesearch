@@ -29,6 +29,15 @@ export interface SearchState {
 let db: IDBPDatabase;
 let mounted = false;
 
+const INITIAL_SEARCH_STATE: SearchState = {
+  matches: [],
+  loading: false,
+  error: "",
+  noResults: false,
+  noMoreResults: false,
+  page: 1, // Move the page state into the state object
+}
+
 async function initDb() {
   return await openDB("searchDatabase", 3, {
     upgrade(db) {
@@ -78,6 +87,7 @@ async function handleSearch(term: string, page: number): Promise<SearchState> {
     loading: false,
     error: data.error,
     noMoreResults: data.error === "No more results available",
+    noResults: data.error === "No results found",
     page
   }));
 }
@@ -98,21 +108,14 @@ const observable$ = searchSubject.pipe(
     )
   ),
   catchError((e, caught) => {
-    console.error(e);
+    console.error(e, caught);
     return caught;
   })
 );
 
 export function useSearch() {
   const [query, setQuery] = useState("");
-  const [state, setState] = useState<SearchState>({
-    matches: [],
-    loading: false,
-    error: "",
-    noResults: false,
-    noMoreResults: false,
-    page: 1, // Move the page state into the state object
-  });
+  const [state, setState] = useState<SearchState>(INITIAL_SEARCH_STATE);
   const [savedQueries, setSavedQueries] = useState<Map<string, string>>(
     new Map()
   );
@@ -142,6 +145,10 @@ export function useSearch() {
     });
   }
 
+  function handleReset() {
+    setState(INITIAL_SEARCH_STATE)
+  }
+
   const handleLoadMoreResults = useCallback(() => {
     console.log("Loading more results");
     searchSubject.next({ term: query, page: state.page + 1 });
@@ -150,12 +157,7 @@ export function useSearch() {
   useSubscription<any>(
     observable$,
     (newState: SearchState) => {
-      console.log("State", {
-        old: state,
-        new: newState,
-      });
-      
-      if (newState.matches && state.page > 1 || (newState.noMoreResults && state.matches.length > 0)) {
+      if (newState.matches && state.page > 1 || (newState.noMoreResults && state.matches.length)) {
         newState.matches = [...state.matches, ...newState.matches];
       }
 
@@ -195,6 +197,7 @@ export function useSearch() {
     state,
     query,
     savedQueries,
+    handleReset,
     handleSetQuery,
     handleSearchChange,
     handleSaveQuery,

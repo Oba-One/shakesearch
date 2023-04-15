@@ -29,7 +29,7 @@ export const Queries: React.FC<QueriesProps> = ({ queries, onQueryClick }) => {
 
   return (
     <>
-      <label htmlFor="queries-drawer" className="drawer-overlay"></label>
+      <label htmlFor="queries-drawer" className="drawer-overlay" style={{backgroundColor: `rgba(0,0,0,0.75`}}></label>
       <div className="w-80 px-4 py-6 flex flex-col gap-4 bg-neutral">
         <h2 className="text-3xl tracking-wide text-secondary">Saved Queries</h2>
         <div className="flex-1 pb-36 text-black">

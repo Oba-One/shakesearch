@@ -18,7 +18,6 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
-	"github.com/lithammer/fuzzysearch/fuzzy"
 )
 
 func main() {
@@ -127,12 +126,12 @@ func (s *Searcher) Search(q string) []SearchResult {
 	findMatches(query, idxs, s.CompleteWorks, 0, &results, uniqueMatches)
 
 	// FIND FUZZY MATCHES
-	fuzzyMatches := fuzzy.RankFindFold(query, s.Words)
-	for _, match := range fuzzyMatches {
-		phrase := match.Target
-		idxs := s.SuffixArray.Lookup([]byte(phrase), -1)
-		findMatches(phrase, idxs, s.CompleteWorks, match.Distance, &results, uniqueMatches)
-	}
+	// fuzzyMatches := fuzzy.RankFindFold(query, s.Words)
+	// for _, match := range fuzzyMatches {
+	// 	phrase := match.Target
+	// 	idxs := s.SuffixArray.Lookup([]byte(phrase), -1)
+	// 	findMatches(phrase, idxs, s.CompleteWorks, match.Distance, &results, uniqueMatches)
+	// }
 
 	// SORT RESULTS
 	sort.Slice(results, func(i, j int) bool {

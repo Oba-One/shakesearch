@@ -11,6 +11,7 @@ const App: React.FC = () => {
     query,
     state,
     savedQueries,
+    handleReset,
     handleSearchChange,
     handleSetQuery,
     handleSaveQuery,
@@ -29,7 +30,7 @@ const App: React.FC = () => {
             onFavoriteClick={handleSaveQuery}
             onChange={handleSearchChange}
           />
-          <Chips onChipClick={handleSetQuery} />
+          <Chips onChipClick={handleSetQuery} onClearClick={handleReset} />
           <Results {...state} loadMoreResults={handleLoadMoreResults} />
         </div>
         <div className="drawer-side">
