@@ -6,10 +6,12 @@ import {
   catchError,
 } from "rxjs/operators";
 import { IDBPDatabase, openDB } from "idb";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { BehaviorSubject, from, merge, of } from "rxjs";
 
 import { useSubscription } from "./useSubscribtion";
+
+import { mathces as mockMatches } from "../../mocks.json";
 
 export interface QueryMatch {
   excerpt: string;
@@ -20,23 +22,19 @@ export interface QueryMatch {
 export interface SearchState {
   matches: QueryMatch[];
   loading: boolean;
-  page: number;
   error?: string;
   noResults?: boolean;
-  noMoreResults?: boolean;
 }
-
-let db: IDBPDatabase;
-let mounted = false;
 
 const INITIAL_SEARCH_STATE: SearchState = {
   matches: [],
   loading: false,
   error: "",
   noResults: false,
-  noMoreResults: false,
-  page: 1, // Move the page state into the state object
-}
+};
+
+let db: IDBPDatabase;
+let mounted = false;
 
 async function initDb() {
   return await openDB("searchDatabase", 3, {
@@ -47,25 +45,31 @@ async function initDb() {
   });
 }
 
-async function handleSearch(term: string, page: number): Promise<SearchState> {
+async function handleSearch(term: string): Promise<SearchState> {
   if (!db) {
     db = await initDb();
   }
 
-  const cacheKey = `${term}-${page}`;
+  const cacheKey = `${term}`;
+
+  return {
+    matches: mockMatches,
+    loading: false,
+    noResults: mockMatches.length === 0,
+  };
 
   const cachedMatches: QueryMatch[] = await db.get("results", cacheKey);
   if (cachedMatches) {
-    return { matches: cachedMatches, loading: false, page };
+    return { matches: cachedMatches, loading: false };
   }
 
-  const response = await fetch(`/search?q=${term}&page=${page}`, {
+  const response = await fetch(`/search?q=${term}`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
     },
     credentials: "same-origin",
-  })
+  });
 
   if (response.ok) {
     const data: QueryMatch[] = await response.json();
@@ -78,7 +82,6 @@ async function handleSearch(term: string, page: number): Promise<SearchState> {
       matches: data,
       loading: false,
       noResults: data.length === 0,
-      page: page + 1
     };
   }
 
@@ -86,25 +89,20 @@ async function handleSearch(term: string, page: number): Promise<SearchState> {
     matches: [],
     loading: false,
     error: data.error,
-    noMoreResults: data.error === "No more results available",
     noResults: data.error === "No results found",
-    page
   }));
 }
 
-const searchSubject = new BehaviorSubject<{ term: string; page: number }>({
-  term: "",
-  page: 1,
-});
+const searchSubject = new BehaviorSubject<string>("");
 
 const observable$ = searchSubject.pipe(
   distinctUntilChanged(), // only emit if value is different from previous value
-  filter(({ term }) => term.length >= 3), // only emit if value is at least 3 characters
-  debounceTime(200), // only emit value after 400ms pause in events
-  switchMap(({ term, page }) =>
+  filter((term) => term.length >= 3), // only emit if value is at least 3 characters
+  debounceTime(400), // only emit value after 400ms pause in events
+  switchMap((term) =>
     merge(
       of({ loading: true, error: "", noResults: false, matches: [] }),
-      from(handleSearch(term.trim(), page))
+      from(handleSearch(term.trim()))
     )
   ),
   catchError((e, caught) => {
@@ -122,16 +120,18 @@ export function useSearch() {
 
   function handleSetQuery(query: string) {
     setQuery(query);
-    searchSubject.next({ term: query, page: 1 });
+    searchSubject.next(query);
   }
 
   function handleSearchChange(event: React.ChangeEvent<HTMLInputElement>) {
     const newQuery = event.target.value;
     setQuery(newQuery);
-    searchSubject.next({ term: newQuery, page: 1 });
+    searchSubject.next(newQuery);
   }
 
   function handleSaveQuery(query: string) {
+    if (!query) return;
+
     setSavedQueries((prevState) => {
       const newMap = new Map(prevState);
 
@@ -146,21 +146,13 @@ export function useSearch() {
   }
 
   function handleReset() {
-    setState(INITIAL_SEARCH_STATE)
+    setState(INITIAL_SEARCH_STATE);
+    setQuery("");
   }
 
-  const handleLoadMoreResults = useCallback(() => {
-    console.log("Loading more results");
-    searchSubject.next({ term: query, page: state.page + 1 });
-  }, [query, state.page]); // Update the dependency array
-
-  useSubscription<any>(
+  useSubscription<SearchState>(
     observable$,
     (newState: SearchState) => {
-      if (newState.matches && state.page > 1 || (newState.noMoreResults && state.matches.length)) {
-        newState.matches = [...state.matches, ...newState.matches];
-      }
-
       setState((prevState) => ({
         ...prevState,
         ...newState,
@@ -176,20 +168,26 @@ export function useSearch() {
       async function init() {
         db = await initDb();
 
-        const savedQueries: Map<string, string> = await db.get("queries", "queries");
+        const savedQueries: Map<string, string> = await db.get(
+          "queries",
+          "queries"
+        );
         if (savedQueries) {
           setSavedQueries(new Map(savedQueries));
         }
       }
-
       init();
     }
 
     return () => {
-      db &&
-        db.put("queries", savedQueries, "queries").catch((e) => {
+      const cleanUp = async () => {
+        try {
+          db && (await db.put("queries", savedQueries, "queries"));
+        } catch (e) {
           console.error("Error caching", e);
-        })
+        }
+      };
+      cleanUp();
     };
   }, []);
 
@@ -201,6 +199,5 @@ export function useSearch() {
     handleSetQuery,
     handleSearchChange,
     handleSaveQuery,
-    handleLoadMoreResults,
   };
 }

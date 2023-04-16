@@ -12,7 +12,7 @@ const Query: React.FC<{
 }> = ({ query, style, onQueryClick }) => (
   <a.li
     style={style}
-    className="card p-4 line-clamp-4 shadow-xl bg-base-100 cursor-pointer hover:shadow-2xl font-light transition-all duration-300 ease-in-out transform-gpu scale-125 opacity-80 hover:opacity-100 hover:bg-rose-200"
+    className="card line-clamp-3 transform-gpu cursor-pointer p-4 text-xl  opacity-80 shadow-xl transition-all duration-300 ease-in-out hover:bg-accent hover:opacity-100"
     onClick={() => onQueryClick(query)}
   >
     {query}
@@ -29,10 +29,14 @@ export const Queries: React.FC<QueriesProps> = ({ queries, onQueryClick }) => {
 
   return (
     <>
-      <label htmlFor="queries-drawer" className="drawer-overlay" style={{backgroundColor: `rgba(0,0,0,0.75`}}></label>
-      <div className="w-80 px-4 py-6 flex flex-col gap-4 bg-neutral">
-        <h2 className="text-3xl tracking-wide text-secondary">Saved Queries</h2>
-        <div className="flex-1 pb-36 text-black">
+      <label
+        htmlFor="queries-drawer"
+        className="drawer-overlay"
+        style={{ backgroundColor: `rgba(0,0,0,0.5` }}
+      ></label>
+      <div className="flex w-80 flex-col gap-4 bg-base-100 px-4 py-6">
+        <h2 className="text-3xl tracking-wide">Saved Queries</h2>
+        <div className="flex-1 pb-36">
           {list.length ? (
             <ul className="flex flex-col gap-4">
               {trail.map((style, index) => (
@@ -45,7 +49,7 @@ export const Queries: React.FC<QueriesProps> = ({ queries, onQueryClick }) => {
               ))}
             </ul>
           ) : (
-            <div className='text-center'>No saved queries</div>
+            <div className="text-center">No saved queries, add some!</div>
           )}
         </div>
       </div>

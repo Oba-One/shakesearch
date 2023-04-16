@@ -24,14 +24,14 @@ export const Search: React.FC<SearchProps> = ({
         {...props}
         value={value}
         placeholder="Thou shall search..."
-        className="input-bordered border-2 input-secondary placeholder:text-slate-900 text-black  input flex-1 shrink"
+        className="input-bordered input-primary input flex-1  shrink border-2"
       />
       <label
         className="swap swap-rotate"
         onClick={() => onFavoriteClick(value)}
       >
         <svg
-          className={`${!favorited ? "swap-on" : ""} h-10 w-10 fill-rose-600`}
+          className={`${!favorited ? "swap-on" : ""} h-10 w-10 fill-primary`}
           height="24"
           width="24"
           viewBox="0 96 960 960"
@@ -39,7 +39,7 @@ export const Search: React.FC<SearchProps> = ({
           <path d="m480 936-58-52q-101-91-167-157T150 608.5Q111 556 95.5 512T80 422q0-94 63-157t157-63q52 0 99 22t81 62q34-40 81-62t99-22q94 0 157 63t63 157q0 46-15.5 90T810 608.5Q771 661 705 727T538 884l-58 52Z" />
         </svg>
         <svg
-          className={`${favorited ? "swap-on" : ""} h-10 w-10 fill-rose-500`}
+          className={`${favorited ? "swap-on" : ""} h-10 w-10 fill-primary`}
           height="24"
           width="24"
           viewBox="0 96 960 960"

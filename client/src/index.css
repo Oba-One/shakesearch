@@ -9,6 +9,13 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
+  --text-color: #000;
+  --surface-color: #fff;
+}
+
+[data-theme="dark"] {
+  --text-color: #fff;
+  --surface-color: #292929;
 }
 
 body {
@@ -17,6 +24,7 @@ body {
   height: 100vh;
   -ms-overflow-style: none; /* IE and Edge */
   scrollbar-width: none; /* Firefox */
+  color: var(--text-color);
 }
 
 body::-webkit-scrollbar,
@@ -24,13 +32,18 @@ div::-webkit-scrollbar {
   display: none;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: "UnifrakturCook", cursive;
-  
 }
 
-p {
-  font-family: "Merriweather", serif;
+p,
+span {
+  font-family: "Roboto", sans-serif;
 }
 
 #root {
@@ -42,6 +55,34 @@ p {
 
 .drawer-toggle:checked ~ .drawer-content {
   --tw-translate-x: 0rem !important;
+}
+
+.ReactModal__Overlay {
+  opacity: 0;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  transition: opacity 200ms ease-in-out;
+  width: 100vw;
+  height: 100vh;
+}
+
+.ReactModal__Overlay--after-open {
+  opacity: 1;
+}
+
+.ReactModal__Overlay--before-close {
+  opacity: 0;
+}
+
+.ReactModal__Content {
+  display: grid;
+  place-items: center;
+  border-radius: 24px !important;
+  background-color: var(--surface-color) !important;
+  margin: auto;
+  @apply max-h-80;
+  @apply w-4/6;
+  @apply text-neutral;
+  /* @apply bg-base-100; */
 }
 
 .logo:hover {

@@ -11,13 +11,13 @@ export const Chips: React.FC<{
   onClearClick: () => void;
 }> = ({ chips = defaultChips, onChipClick, onClearClick }) => {
   return (
-    <div className="flex flex-col lg:flex-row items-center md:flex-nowrap lg:justify-between gap-4 ">
-      <ul className="flex flex-1 nowrap gap-2">
+    <div className="flex flex-col items-center gap-4 md:flex-nowrap lg:flex-row lg:justify-between ">
+      <ul className="nowrap flex flex-1 gap-2">
         {chips.map((chip) => (
           <li
             key={chip}
             onClick={() => onChipClick(chip)}
-            className="badge badge-lg cursor-pointer text-black px-4 line-clamp-1 font-medium shrink opacity-80 transfrom-opacity duration-300 ease-in-out hover:opacity-100"
+            className="transfrom-opacity badge badge-secondary badge-lg line-clamp-1 shrink cursor-pointer px-4 font-medium opacity-80 duration-300 ease-in-out hover:opacity-100"
           >
             {chip}
           </li>
@@ -28,7 +28,7 @@ export const Chips: React.FC<{
           key="clear"
           role="listitem"
           onClick={onClearClick}
-          className="btn btn-sm btn-outline btn-secondary "
+          className="btn-secondary btn-outline btn-sm btn "
         >
           Clear
         </label>
@@ -36,7 +36,7 @@ export const Chips: React.FC<{
           key="saved"
           role="listitem"
           htmlFor="queries-drawer"
-          className="btn btn-sm btn-accent drawer-button "
+          className="btn-accent drawer-button btn-sm btn "
         >
           Saved
         </label>

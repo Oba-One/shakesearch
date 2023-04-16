@@ -18,47 +18,63 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
+	"github.com/lithammer/fuzzysearch/fuzzy"
 )
 
 func main() {
+	// LOAD SHAKESPEARE'S WORKS
 	searcher := Searcher{}
 	err := searcher.Load("completeworks.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
 	
+	// LOAD ENVIRONMENT VARS
+	err = godotenv.Load(".env")
+	if err != nil {
+		log.Fatalf("Error loading environment variables file")
+	}
+
 	e := echo.New()
-	
+
+	// MIDDLEWARE
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			c.Request().Body = http.MaxBytesReader(c.Response(), c.Request().Body, 1000)
+			return next(c)
+		}
+	})
+
+	// ROUTES
 	e.Static("/", "client/dist")
 	e.GET("/status", func(c echo.Context) error {
 		return c.String(http.StatusOK, "Everything quiet over here.")
 	})
 	e.GET("/search", handleSearch(searcher))
 
-	err = godotenv.Load(".env")
-	if err != nil {
-		log.Fatalf("Error loading environment variables file")
-	}
-
+	// START SERVER
 	host := os.Getenv("API_HOST")
 	e.Logger.Fatal(e.Start(host))		
 }
 
-const pageSize = 20
-const	cacheTimeout = 5 * time.Minute
+const (
+	cacheTimeout       = 5 * time.Minute
+	maxAllowedDistance = 2
+	maxQueryLength     = 1000
+)
+
+var validChars = regexp.MustCompile(`^[a-zA-Z0-9\s.,;:!?'-]+$`)
 
 func handleSearch(searcher Searcher) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		query := c.QueryParam("q")
 
-		if len(query) < 1 || len(query) > 1000 {
-    	return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid query length"})
+		if len(query) < 3 || len(query) > maxQueryLength {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid query length"})
 		}
 
-		var validChars = regexp.MustCompile(`^[a-zA-Z0-9\s.,;:!?'-]+$`)
-
 		if !validChars.MatchString(query) {
-				return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid characters in query"})
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid characters in query"})
 		}
 
 		pageParam := c.QueryParam("page")
@@ -76,29 +92,13 @@ func handleSearch(searcher Searcher) echo.HandlerFunc {
 		}
 
 		searchResults := searcher.Search(query)
-
 		if len(searchResults) == 0 {
 			return c.JSON(http.StatusNotFound, map[string]string{"error": "No results found"})
 		}
 
-		totalResults := len(searchResults)
-		totalPages := (totalResults + pageSize - 1) / pageSize
-
-		if page > totalPages {
-			return c.JSON(http.StatusOK, map[string]string{"error": "No more results available"})
-		}
-
-		start := (page - 1) * pageSize
-		end := start + pageSize
-		if end > totalResults {
-			end = totalResults
-		}
-
-		paginatedResults := searchResults[start:end]
-
 		buf := &bytes.Buffer{}
 		enc := json.NewEncoder(buf)
-		err = enc.Encode(paginatedResults)
+		err = enc.Encode(searchResults)
 		if err != nil {
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Encoding failure"})
 		}
@@ -123,15 +123,17 @@ func (s *Searcher) Search(q string) []SearchResult {
 
 	// FIND EXACT MATCHES
 	idxs := s.SuffixArray.Lookup([]byte(query), -1)
-	findMatches(query, idxs, s.CompleteWorks, 0, &results, uniqueMatches)
+	exactMatchesFound := findMatches(query, idxs, s.CompleteWorks, 0, &results, uniqueMatches)
 
-	// FIND FUZZY MATCHES
-	// fuzzyMatches := fuzzy.RankFindFold(query, s.Words)
-	// for _, match := range fuzzyMatches {
-	// 	phrase := match.Target
-	// 	idxs := s.SuffixArray.Lookup([]byte(phrase), -1)
-	// 	findMatches(phrase, idxs, s.CompleteWorks, match.Distance, &results, uniqueMatches)
-	// }
+	// FIND FUZZY MATCHES IF NO EXACT MATCHES ARE FOUND
+	if !exactMatchesFound {
+		fuzzyMatches := strictFuzzyMatches(query, s.Words, maxAllowedDistance)
+		for _, match := range fuzzyMatches {
+			phrase := match.Target
+			idxs := s.SuffixArray.Lookup([]byte(phrase), -1)
+			findMatches(phrase, idxs, s.CompleteWorks, match.Distance, &results, uniqueMatches)
+		}
+	}
 
 	// SORT RESULTS
 	sort.Slice(results, func(i, j int) bool {
@@ -148,13 +150,13 @@ func (s *Searcher) Search(q string) []SearchResult {
 }
 
 func (s *Searcher) Load(filename string) error {
-		// LOAD SHAKESPEARE'S WORKS
+		// LOAD TEXT FILE
     dat, err := ioutil.ReadFile(filename)
     if err != nil {
         return fmt.Errorf("Load: %w", err)
     }
 
-		// PREPROCESS WORKS
+		// PREPROCESS TEXT
     s.CompleteWorks = string(dat)
     s.CompleteWorksLowercase = strings.ToLower(s.CompleteWorks)
     wordPattern := regexp.MustCompile(`\w+`)
@@ -172,14 +174,15 @@ func (s *Searcher) Load(filename string) error {
 
     return nil
 }
-
-func findMatches(query string, idxs []int, completeWorks string, distance int, results *[]SearchResult, uniqueMatches map[string]struct{}) {
+ 
+func findMatches(query string, idxs []int, completeWorks string, distance int, results *[]SearchResult, uniqueMatches map[string]struct{}) bool {
+	exactMatchesFound := false
 	for _, idx := range idxs {
-		start := idx - 250
+		start := idx - 200
 		if start < 0 {
 			start = 0 // stay in bounds
 		}
-		end := idx + 250
+		end := idx + 200
 		if end > len(completeWorks) {
 			end = len(completeWorks) // stay in bounds
 		}
@@ -193,8 +196,23 @@ func findMatches(query string, idxs []int, completeWorks string, distance int, r
 				Weight:  distance,
 			}
 			*results = append(*results, result)
+			exactMatchesFound = true
 		}
 	}
+	return exactMatchesFound
+}
+
+func strictFuzzyMatches(query string, words []string, maxDistance int) []fuzzy.Rank {
+    rankedMatches := fuzzy.RankFindFold(query, words)
+    strictMatches := make([]fuzzy.Rank, 0)
+
+    for _, match := range rankedMatches {
+        if match.Distance <= maxDistance {
+            strictMatches = append(strictMatches, match)
+        }
+    }
+
+    return strictMatches
 }
 
 type Searcher struct {

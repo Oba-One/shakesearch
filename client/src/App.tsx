@@ -15,13 +15,12 @@ const App: React.FC = () => {
     handleSearchChange,
     handleSetQuery,
     handleSaveQuery,
-    handleLoadMoreResults,
   } = useSearch();
 
   return (
     <>
       <AppBar />
-      <main className="drawer drawer-end">
+      <main className="drawer drawer-end bg-base-100 text-neutral">
         <input id="queries-drawer" type="checkbox" className="drawer-toggle" />
         <div className="drawer-content flex w-full flex-1 flex-col gap-4 px-4 py-6">
           <Search
@@ -31,7 +30,7 @@ const App: React.FC = () => {
             onChange={handleSearchChange}
           />
           <Chips onChipClick={handleSetQuery} onClearClick={handleReset} />
-          <Results {...state} loadMoreResults={handleLoadMoreResults} />
+          <Results {...state} />
         </div>
         <div className="drawer-side">
           <Queries queries={savedQueries} onQueryClick={handleSetQuery} />
