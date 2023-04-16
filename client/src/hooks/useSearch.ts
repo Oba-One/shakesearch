@@ -52,11 +52,13 @@ async function handleSearch(term: string): Promise<SearchState> {
 
   const cacheKey = `${term}`;
 
-  return {
-    matches: mockMatches,
-    loading: false,
-    noResults: mockMatches.length === 0,
-  };
+  if (import.meta.env.DEV) {
+    return {
+      matches: mockMatches,
+      loading: false,
+      noResults: mockMatches.length === 0,
+    };
+  }
 
   const cachedMatches: QueryMatch[] = await db.get("results", cacheKey);
   if (cachedMatches) {

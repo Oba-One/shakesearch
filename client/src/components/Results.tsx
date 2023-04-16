@@ -1,7 +1,7 @@
 import Modal from "react-modal";
 import { useState } from "react";
 import { FixedSizeGrid } from "react-window";
-import { useSpring } from "@react-spring/web";
+import { useTrail } from "@react-spring/web";
 import Autosizer from "react-virtualized-auto-sizer";
 
 import { SearchState } from "../hooks/useSearch";
@@ -56,7 +56,7 @@ export const Results: React.FC<ResultsProps> = ({
     grid.cols = 1;
   }
 
-  const spring = useSpring({
+  const trail = useTrail(matches.length, {
     from: { opacity: 0, transform: "translate3d(0, 40px, 0)" },
     to: { opacity: 1, transform: "translate3d(0, 0px, 0)" },
   });
@@ -91,7 +91,7 @@ export const Results: React.FC<ResultsProps> = ({
     return (
       <Result
         key={excerpt}
-        style={{ ...style, ...spring }}
+        style={{ ...style, ...trail[index] }}
         match={match}
         excerpt={excerpt}
         onCardClick={handleCardClick}
