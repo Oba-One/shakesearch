@@ -33,7 +33,7 @@ const INITIAL_SEARCH_STATE: SearchState = {
   noResults: false,
 };
 
-let db: IDBPDatabase;
+let db: IDBPDatabase | null = null;
 let mounted = false;
 
 async function initDb() {
@@ -100,7 +100,7 @@ const searchSubject = new BehaviorSubject<string>("");
 const observable$ = searchSubject.pipe(
   distinctUntilChanged(), // only emit if value is different from previous value
   filter((term) => term.length >= 3), // only emit if value is at least 3 characters
-  debounceTime(400), // only emit value after 400ms pause in events
+  debounceTime(360), // only emit value after 400ms pause in events
   switchMap((term) =>
     merge(
       of({ loading: true, error: "", noResults: false, matches: [] }),
@@ -168,7 +168,9 @@ export function useSearch() {
       mounted = true;
 
       async function init() {
-        db = await initDb();
+        if (!db) {
+          db = await initDb();
+        }
 
         const savedQueries: Map<string, string> = await db.get(
           "queries",
@@ -184,7 +186,9 @@ export function useSearch() {
     return () => {
       const cleanUp = async () => {
         try {
-          db && (await db.put("queries", savedQueries, "queries"));
+          if (db) {
+            await db.put("queries", savedQueries, "queries");
+          }
         } catch (e) {
           console.error("Error caching", e);
         }
